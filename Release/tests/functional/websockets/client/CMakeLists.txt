@@ -1,6 +1,4 @@
 if (NOT CPPREST_EXCLUDE_WEBSOCKETS)
-  include_directories(../utilities)
-  
   set(SOURCES
     authentication_tests.cpp
     client_construction.cpp
@@ -8,8 +6,10 @@ if (NOT CPPREST_EXCLUDE_WEBSOCKETS)
     error_tests.cpp
     receive_msg_tests.cpp
     send_msg_tests.cpp
+    stdafx.cpp
   )
 
-  add_casablanca_test(${LIB}websocketclient_test SOURCES)
-  target_link_libraries(${LIB}websocketclient_test ${LIB}websockettest_utilities)
+  # This works around "OBJECT" tests
+  link_libraries(websockettest_utilities)
+  add_casablanca_test(websocketclient_test SOURCES)
 endif()
