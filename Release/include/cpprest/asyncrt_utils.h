@@ -19,7 +19,6 @@
 #include <system_error>
 #include <random>
 #include <locale.h>
-
 #include "pplx/pplxtasks.h"
 #include "cpprest/details/basic_types.h"
 
@@ -28,8 +27,9 @@
 #endif
 
 #ifndef _WIN32
+#include <sys/time.h>
 #include <boost/algorithm/string.hpp>
-#if !defined(ANDROID) && !defined(__ANDROID__) && !defined(__GLIBC__) // CodePlex 269
+#if !defined(ANDROID) && !defined(__ANDROID__) && defined(HAVE_XLOCALE_H) // CodePlex 269
 /* Systems using glibc: xlocale.h has been removed from glibc 2.26
    The above include of locale.h is sufficient
    Further details: https://sourceware.org/git/?p=glibc.git;a=commit;h=f0be25b6336db7492e47d2e8e72eb8af53b5506d */
@@ -269,6 +269,16 @@ namespace conversions
             return val;
         }
 
+        template<typename Source>
+        utf8string print_utf8string(const Source& val)
+        {
+            return conversions::to_utf8string(print_string(val));
+        }
+        inline const utf8string& print_utf8string(const utf8string& val)
+        {
+            return val;
+        }
+
         template <typename Target>
         Target scan_string(const utility::string_t &str)
         {
@@ -407,9 +417,9 @@ class windows_category_impl : public std::error_category
 public:
     virtual const char *name() const CPPREST_NOEXCEPT { return "windows"; }
 
-    _ASYNCRTIMP virtual std::string message(int errorCode) const CPPREST_NOEXCEPT;
+    virtual std::string message(int errorCode) const CPPREST_NOEXCEPT;
 
-    _ASYNCRTIMP virtual std::error_condition default_error_condition(int errorCode) const CPPREST_NOEXCEPT;
+    virtual std::error_condition default_error_condition(int errorCode) const CPPREST_NOEXCEPT;
 };
 
 /// <summary>

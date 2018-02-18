@@ -13,6 +13,9 @@
 
 #include "stdafx.h"
 
+#undef min
+#undef max
+
 using namespace web;
 
 bool json::details::g_keep_json_object_unsorted = false;
@@ -382,6 +385,41 @@ bool web::json::details::_Object::has_field(const utility::string_t &key) const
     return m_object.find(key) != m_object.end();
 }
 
+bool web::json::value::has_number_field(const utility::string_t &key) const
+{
+	return has_field(key) && at(key).is_number();
+}
+
+bool web::json::value::has_integer_field(const utility::string_t &key) const
+{
+	return has_field(key) && at(key).is_integer();
+}
+
+bool web::json::value::has_double_field(const utility::string_t &key) const
+{
+	return has_field(key) && at(key).is_double();
+}
+
+bool web::json::value::has_boolean_field(const utility::string_t &key) const
+{
+	return has_field(key) && at(key).is_boolean();
+}
+
+bool web::json::value::has_string_field(const utility::string_t &key) const
+{
+	return has_field(key) && at(key).is_string();
+}
+
+bool web::json::value::has_array_field(const utility::string_t &key) const
+{
+	return has_field(key) && at(key).is_array();
+}
+
+bool web::json::value::has_object_field(const utility::string_t &key) const
+{
+	return has_field(key) && at(key).is_object();
+}
+
 utility::string_t json::value::to_string() const
 {
 #ifndef _WIN32
@@ -481,3 +519,4 @@ const web::json::details::json_error_category_impl& web::json::details::json_err
 #endif
     return instance;
 }
+

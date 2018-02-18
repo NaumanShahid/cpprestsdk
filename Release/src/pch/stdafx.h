@@ -19,9 +19,6 @@
 #pragma clang diagnostic ignored "-Winfinite-recursion"
 #endif
 
-#include "cpprest/details/cpprest_compat.h"
-#include "cpprest/details/basic_types.h"
-
 #ifdef _WIN32
 #ifdef CPPREST_TARGET_XP
 #include <winsdkver.h>
@@ -37,12 +34,7 @@
     #include <crtdbg.h>
 #endif
 
-#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
-// Windows Header Files:
-#define NOMINMAX
-#endif
-
 #include <windows.h>
 #include <objbase.h>
 
@@ -88,12 +80,16 @@
 #include <exception>
 #include <assert.h>
 #include <streambuf>
+#include <atomic>
 #include <mutex>
 #include <array>
 #include <vector>
 #include <memory>
 #include <thread>
 #include <set>
+
+#include "cpprest/details/cpprest_compat.h"
+#include "cpprest/details/basic_types.h"
 
 #include "pplx/pplxtasks.h"
 #include "cpprest/version.h"
@@ -110,7 +106,6 @@
 
 // uri
 #include "cpprest/base_uri.h"
-#include "cpprest/details/uri_parser.h"
 
 // utilities
 #include "cpprest/asyncrt_utils.h"
@@ -138,13 +133,6 @@
 #include "cpprest/http_listener.h"
 #include "cpprest/details/http_server_api.h"
 #endif // _WIN32_WINNT >= _WIN32_WINNT_VISTA
-#endif
-
-#if defined(max)
-#error: max macro defined -- make sure to #define NOMINMAX before including windows.h
-#endif
-#if defined(min)
-#error: min macro defined -- make sure to #define NOMINMAX before including windows.h
 #endif
 
 #if defined(__clang__)

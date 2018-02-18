@@ -4,10 +4,14 @@ if(POLICY CMP0042)
   cmake_policy(SET CMP0042 NEW) # use MACOSX_RPATH
 endif()
 if(UNIX)
-  project(cpprest C CXX)
+  project(cpprestsdk C CXX)
 else()
-  project(cpprest CXX)
+  project(cpprestsdk CXX)
 endif()
+
+set(CPPREST_VERSION_MAJOR 2)
+set(CPPREST_VERSION_MINOR 10)
+set(CPPREST_VERSION_REVISION 2)
 
 enable_testing()
 
@@ -32,6 +36,22 @@ else()
   set(BUILD_SAMPLES ON CACHE BOOL "Build sample applications.")
 endif()
 
+if(WIN32)
+  set(CMAKE_DEBUG_POSTFIX "d" CACHE STRING "Default filename postfix for libraries under configuration DEBUG")
+else()
+  set(CMAKE_DEBUG_POSTFIX "" CACHE STRING "Default filename postfix for libraries under configuration DEBUG")
+endif()
+
+if(WIN32)
+  set(TOOLSET)
+  if(CMAKE_VS_PLATFORM_TOOLSET)
+    string(REGEX REPLACE "^v" "" TOOLSET "${CMAKE_VS_PLATFORM_TOOLSET}")
+  endif()
+  set(CPPREST_ABI_TAG "${TOOLSET}_${CPPREST_VERSION_MAJOR}_${CPPREST_VERSION_MINOR}" CACHE STRING "Postfix tag for the cpprest abi")
+else()
+  set(CPPREST_ABI_TAG "" CACHE STRING "Postfix tag for the cpprest abi")
+endif()
+
 if(ANDROID)
   set(Boost_USE_STATIC_LIBS ON CACHE BOOL "Link against boost statically.")
 else()
@@ -42,6 +62,7 @@ include(cmake/cpprest_find_boost.cmake)
 include(cmake/cpprest_find_zlib.cmake)
 include(cmake/cpprest_find_openssl.cmake)
 include(cmake/cpprest_find_websocketpp.cmake)
+include(CheckIncludeFiles)
 
 find_package(Threads REQUIRED)
 if(THREADS_HAVE_PTHREAD_ARG)
@@ -54,6 +75,10 @@ endif()
 # Internal component selection logic. This allows us to avoid duplicating platform logic in multiple places.
 if(CPPREST_EXCLUDE_WEBSOCKETS)
   set(CPPREST_WEBSOCKETS_IMPL none CACHE STRING "Internal use.")
+endif()
+
+if(NOT WIN32)
+  CHECK_INCLUDE_FILES(xlocale.h HAVE_XLOCALE_H)
 endif()
 
 if(APPLE) # Note: also iOS
@@ -69,7 +94,7 @@ elseif(UNIX AND NOT APPLE) # Note: also android
   set(CPPREST_HTTP_CLIENT_IMPL asio CACHE STRING "Internal use.")
   set(CPPREST_HTTP_LISTENER_IMPL asio CACHE STRING "Internal use.")
 elseif(WINDOWS_PHONE OR WINDOWS_STORE)
-  set(CPPREST_PPLX_IMPL win CACHE STRING "Internal use.")
+  set(CPPREST_PPLX_IMPL winrt CACHE STRING "Internal use.")
   set(CPPREST_WEBSOCKETS_IMPL winrt CACHE STRING "Internal use.")
   set(CPPREST_FILEIO_IMPL winrt CACHE STRING "Internal use.")
   set(CPPREST_HTTP_CLIENT_IMPL winrt CACHE STRING "Internal use.")
@@ -115,16 +140,19 @@ elseif(ANDROID)
     )
 elseif(UNIX) # This includes OSX
 elseif(WIN32)
-  add_definitions(-DUNICODE -D_UNICODE -D_WIN32_WINNT=0x0600 -DWIN32 -D_SCL_SECURE_NO_WARNINGS)
+  add_definitions(-DUNICODE -D_UNICODE -DWIN32 -D_SCL_SECURE_NO_WARNINGS)
+  if(CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
+    add_definitions(-D_WIN32_WINNT=0x0A00)
+  else()
+    add_definitions(-D_WIN32_WINNT=0x0600)
+  endif()
 
   if(NOT BUILD_SHARED_LIBS)
     # This causes cmake to not link the test libraries separately, but instead hold onto their object files.
     set(TEST_LIBRARY_TARGET_TYPE OBJECT)
-    set(Casablanca_DEFINITIONS -D_NO_ASYNCRTIMP -D_NO_PPLXIMP CACHE INTERNAL "Definitions for consume casablanca library")
-  else()
-    set(Casablanca_DEFINITIONS "" CACHE INTERNAL "Definitions for consume casablanca library")
   endif()
-  add_definitions(${Casablanca_DEFINITIONS} -D_WINSOCK_DEPRECATED_NO_WARNINGS)
+
+  add_definitions(-D_WINSOCK_DEPRECATED_NO_WARNINGS)
 else()
   message(FATAL_ERROR "-- Unsupported Build Platform.")
 endif()
@@ -160,6 +188,9 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   set(LD_FLAGS "${LD_FLAGS} -Wl,-z,defs")
 
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fno-strict-aliasing")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.8)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive -D_GLIBCXX_USE_SCHED_YIELD -D_GLIBCXX_USE_NANOSLEEP")
+  endif()
 
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
   message("-- Setting msvc options")
@@ -193,16 +224,15 @@ function(add_casablanca_test NAME SOURCES_VAR)
   add_library(${NAME} ${TEST_LIBRARY_TARGET_TYPE} ${${SOURCES_VAR}})
   message("-- Added test library ${NAME}")
   if(TEST_LIBRARY_TARGET_TYPE STREQUAL "OBJECT")
-    foreach(_dep httptest_utilities common_utilities unittestpp cpprest)
+    foreach(_dep cpprest common_utilities unittestpp)
       target_include_directories(${NAME} PRIVATE $<TARGET_PROPERTY:${_dep},INTERFACE_INCLUDE_DIRECTORIES>)
       target_compile_definitions(${NAME} PRIVATE $<TARGET_PROPERTY:${_dep},INTERFACE_COMPILE_DEFINITIONS>)
     endforeach()
   else()
-    target_link_libraries(${NAME}
-      httptest_utilities
+    target_link_libraries(${NAME} PRIVATE
+      cpprest
       common_utilities
       unittestpp
-      cpprest
       ${ANDROID_STL_FLAGS}
     )
     if (BUILD_SHARED_LIBS)

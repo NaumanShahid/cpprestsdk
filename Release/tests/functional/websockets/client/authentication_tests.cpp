@@ -162,15 +162,18 @@ TEST(sni_with_older_server_test)
 }
 
 // WinRT doesn't expose option for disabling.
-TEST(disable_sni)
+// No stable server is available to reliably test this.
+// The configuration below relies on a timeout in the success case.
+TEST(disable_sni, "Ignore", "Manual")
 {
     websocket_client_config config;
+    config.set_server_name("expired.badssl.com");
     config.disable_sni();
     websocket_client client(config);
 
     try
     {
-        client.connect(U("wss://swordsoftruth.com")).wait();
+        client.connect(U("wss://badssl.com")).wait();
 
         // Should never be reached.
         VERIFY_IS_TRUE(false);
@@ -219,17 +222,17 @@ void handshake_error_test_impl(const ::utility::string_t &host)
 
 TEST(self_signed_cert)
 {
-    handshake_error_test_impl(U("wss://www.pcwebshop.co.uk/"));
+    handshake_error_test_impl(U("wss://self-signed.badssl.com/"));
 }
 
 TEST(hostname_mismatch)
 {
-    handshake_error_test_impl(U("wss://jabbr.net"));
+    handshake_error_test_impl(U("wss://wrong.host.badssl.com/"));
 }
 
 TEST(cert_expired)
 {
-    handshake_error_test_impl(U("wss://tv.eurosport.com/"));
+    handshake_error_test_impl(U("wss://expired.badssl.com/"));
 }
 
 #endif
@@ -239,3 +242,4 @@ TEST(cert_expired)
 }}}}
 
 #endif
+

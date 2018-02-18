@@ -20,6 +20,10 @@
 
 #include "ws_client_impl.h"
 
+// These must be undef'ed before including websocketpp because it is not Windows.h safe.
+#undef min
+#undef max
+
 // Force websocketpp to use C++ std::error_code instead of Boost.
 #define _WEBSOCKETPP_CPP11_SYSTEM_ERROR_
 #if defined(_MSC_VER)
@@ -73,7 +77,9 @@ static struct ASIO_SSL_memory_leak_suppress
 {
     ~ASIO_SSL_memory_leak_suppress()
     {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
         ::SSL_COMP_free_compression_methods();
+#endif
     }
 } ASIO_SSL_memory_leak_suppressor;
 
@@ -125,7 +131,7 @@ public:
 #endif
     {}
 
-    ~wspp_callback_client()
+    ~wspp_callback_client() CPPREST_NOEXCEPT
     {
         _ASSERTE(m_state < DESTROYED);
         std::unique_lock<std::mutex> lock(m_wspp_client_lock);
@@ -208,7 +214,7 @@ public:
                     return rfc2818(preverified, verifyCtx);
                 });
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
                 // OpenSSL stores some per thread state that never will be cleaned up until
                 // the dll is unloaded. If static linking, like we do, the state isn't cleaned up
                 // at all and will be reported as leaks.
@@ -310,6 +316,15 @@ public:
             shutdown_wspp_impl<WebsocketConfigType>(con_hdl, false);
         });
 
+        // Set User Agent specified by the user. This needs to happen before any connection is created
+        const auto& headers = m_config.headers();
+
+        auto user_agent_it = headers.find(web::http::header_names::user_agent);
+        if (user_agent_it != headers.end())
+        {
+            client.set_user_agent(utility::conversions::to_utf8string(user_agent_it->second));
+        }
+
         // Get the connection handle to save for later, have to create temporary
         // because type erasure occurs with connection_hdl.
         websocketpp::lib::error_code ec;
@@ -321,7 +336,6 @@ public:
         }
 
         // Add any request headers specified by the user.
-        const auto & headers = m_config.headers();
         for (const auto & header : headers)
         {
             if (!utility::details::str_icmp(header.first, g_subProtocolHeader))
@@ -380,7 +394,7 @@ public:
             crossplat::JVM.load()->DetachCurrentThread();
 #endif
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
             // OpenSSL stores some per thread state that never will be cleaned up until
             // the dll is unloaded. If static linking, like we do, the state isn't cleaned up
             // at all and will be reported as leaks.
@@ -728,6 +742,7 @@ private:
     };
     struct websocketpp_client : websocketpp_client_base
     {
+        ~websocketpp_client() CPPREST_NOEXCEPT {}
         websocketpp::client<websocketpp::config::asio_client> & non_tls_client() override
         {
             return m_client;
@@ -737,6 +752,7 @@ private:
     };
     struct websocketpp_tls_client : websocketpp_client_base
     {
+        ~websocketpp_tls_client() CPPREST_NOEXCEPT {}
         websocketpp::client<websocketpp::config::asio_tls_client> & tls_client() override
         {
             return m_client;
@@ -790,3 +806,4 @@ websocket_callback_client::websocket_callback_client(websocket_client_config con
 }}}
 
 #endif
+
